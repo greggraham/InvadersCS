@@ -30,16 +30,21 @@ namespace InvadersCS
         private SoundEffect _explosion;
 
         private const int _numSaucers = 5;
+        private const int _numPlasmas = 5;
         private const int _gameOverInvasions = 10;
+
         private float _shipSpeed = 200;
         private float _plasmaSpeed = 300;
         private float _saucerSpeed = 60;
+        private TimeSpan _fireDelay = TimeSpan.FromSeconds(0.15);
+        private TimeSpan _fireTimer = new TimeSpan(0);
 
         private int _score = 0;
         private int _invasions = 0;
 
         private Vector2 _shipPosition;
-        private Vector2 _plasmaPosition;
+        private Vector2[] _plasmaPositions = new Vector2[_numPlasmas];
+        private int _nextPlasmaPos = 0;
         private Vector2[] _saucerPositions = new Vector2[_numSaucers];
 
         public Game1()
@@ -63,9 +68,12 @@ namespace InvadersCS
         {
             // TODO: Add your initialization logic here
             _shipPosition = new Vector2(_width / 2, _height - 80);
-            _plasmaPosition = new Vector2(-10, -10);
-            var saucer_y = -10;
-            for (var i = 0; i < _saucerPositions.Length; i++)
+            for (int i = 0; i < _numPlasmas; i++)
+            {
+                _plasmaPositions[i] = new Vector2(-10, -10);
+            }
+            int saucer_y = -10;
+            for (int i = 0; i < _numSaucers; i++)
             {
                 _saucerPositions[i] = new Vector2(_rand.Next(_width), saucer_y);
                 saucer_y -= 80;
@@ -132,24 +140,33 @@ namespace InvadersCS
                     _shipPosition.X += _shipSpeed * (float)gameTime.ElapsedGameTime.TotalSeconds;
                 }
 
-                if (kstate.IsKeyDown(Keys.Space) && _plasmaPosition.Y < _height * 0.6f)
+                if (kstate.IsKeyDown(Keys.Space) && gameTime.TotalGameTime > _fireTimer)
                 {
-                    _plasmaPosition.X = _shipPosition.X;
-                    _plasmaPosition.Y = _shipPosition.Y - 6;
+                    _plasmaPositions[_nextPlasmaPos].X = _shipPosition.X;
+                    _plasmaPositions[_nextPlasmaPos].Y = _shipPosition.Y - 6;
+                    _nextPlasmaPos++;
+                    if (_nextPlasmaPos >= _numPlasmas)
+                    {
+                        _nextPlasmaPos = 0;
+                    }
+                    _fireTimer = gameTime.TotalGameTime + _fireDelay;
                     _shoot.Play();
                 }
 
-                if (IsOnScreen(_plasmaPosition))
+                for (int j = 0; j < _numPlasmas; j++)
                 {
-                    _plasmaPosition.Y -= _plasmaSpeed * (float)gameTime.ElapsedGameTime.TotalSeconds;
-                    for (var i = 0; i < _saucerPositions.Length; i++)
+                    if (IsOnScreen(_plasmaPositions[j]))
                     {
-                        if (Collision(_saucerTexture, _saucerPositions[i], _plasmaTexture, _plasmaPosition))
+                        _plasmaPositions[j].Y -= _plasmaSpeed * (float)gameTime.ElapsedGameTime.TotalSeconds;
+                        for (int i = 0; i < _saucerPositions.Length; i++)
                         {
-                            _score++;
-                            _saucerPositions[i] = ResetSaucer(_saucerPositions[i]);
-                            _plasmaPosition = new Vector2(-10, -10);
-                            _explosion.Play();
+                            if (Collision(_saucerTexture, _saucerPositions[i], _plasmaTexture, _plasmaPositions[j]))
+                            {
+                                _score++;
+                                _saucerPositions[i] = ResetSaucer(_saucerPositions[i]);
+                                _plasmaPositions[j] = new Vector2(-10, -10);
+                                _explosion.Play();
+                            }
                         }
                     }
                 }
@@ -261,7 +278,10 @@ namespace InvadersCS
             else
             {
                 DrawCentered(_shipTexture, _shipPosition);
-                DrawCentered(_plasmaTexture, _plasmaPosition);
+                foreach (var pos in _plasmaPositions)
+                {
+                    DrawCentered(_plasmaTexture, pos);
+                }
                 foreach (var pos in _saucerPositions)
                 {
                     DrawCentered(_saucerTexture, pos);
